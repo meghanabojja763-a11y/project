@@ -1,5 +1,6 @@
 import streamlit as st
 import math
+import requests
 
 # Function to calculate distance (Haversine formula)
 def haversine(lat1, lon1, lat2, lon2):
@@ -19,33 +20,58 @@ rentals = [
     {"name": "House Rental D", "lat": 17.370, "lon": 78.490, "type": "House", "price": "₹12,000/month"}
 ]
 
-# Streamlit UI
-st.title("🏠🚗 Nearby Rental Service Finder")
+st.title("🏠🚗 Nearby Rental Finder")
 
-st.write("Find rental houses or cars near your location!")
+st.write("Find rental houses or cars by using **Live Location** or typing an **Area/City Name**")
 
-# User inputs
-lat = st.number_input("Enter your latitude:", value=17.392, format="%.6f")
-lon = st.number_input("Enter your longitude:", value=78.487, format="%.6f")
-radius = st.slider("Search radius (km):", 1, 20, 5)
+option = st.radio("Choose Location Input Method:", ["📍 Use Live Location", "⌨️ Enter Area/City Name"])
 
-# Filter rentals
-nearby = []
-for r in rentals:
-    dist = haversine(lat, lon, r["lat"], r["lon"])
-    if dist <= radius:
-        nearby.append((r, dist))
+user_lat, user_lon = None, None
 
-# Show results
-if nearby:
-    st.subheader("🔎 Nearby Rentals Found:")
-    for r, dist in nearby:
-        st.markdown(f"""
-        **{r['name']}**  
-        📍 Type: {r['type']}  
-        💰 Price: {r['price']}  
-        📏 Distance: {dist:.2f} km
-        """)
+# Option 1: Live Location
+if option == "📍 Use Live Location":
+    # Streamlit can't directly access GPS, so we use ipinfo.io (approx location by IP)
+    if st.button("Get My Live Location"):
+        try:
+            res = requests.get("https://ipinfo.io/json").json()
+            loc = res["loc"].split(",")
+            user_lat, user_lon = float(loc[0]), float(loc[1])
+            st.success(f"✅ Location detected: Lat {user_lat}, Lon {user_lon}")
+        except:
+            st.error("Could not fetch live location automatically.")
+
+# Option 2: Area/City Name
 else:
-    st.warning("No rentals found in this area. Try increasing the radius.")
+    area = st.text_input("Enter Area or City Name (e.g., Hyderabad, Mumbai):")
+    if area:
+        try:
+            url = f"https://nominatim.openstreetmap.org/search?format=json&q={area}"
+            response = requests.get(url).json()
+            if response:
+                user_lat, user_lon = float(response[0]["lat"]), float(response[0]["lon"])
+                st.success(f"✅ Location found: {area} (Lat {user_lat}, Lon {user_lon})")
+            else:
+                st.error("❌ Location not found. Try another area.")
+        except:
+            st.error("⚠️ Error fetching location data.")
 
+# Search nearby rentals
+if user_lat and user_lon:
+    radius = st.slider("Search radius (km):", 1, 20, 5)
+    nearby = []
+    for r in rentals:
+        dist = haversine(user_lat, user_lon, r["lat"], r["lon"])
+        if dist <= radius:
+            nearby.append((r, dist))
+
+    if nearby:
+        st.subheader("🔎 Nearby Rentals:")
+        for r, dist in nearby:
+            st.markdown(f"""
+            **{r['name']}**  
+            📍 Type: {r['type']}  
+            💰 Price: {r['price']}  
+            📏 Distance: {dist:.2f} km
+            """)
+    else:
+        st.warning("No rentals found nearby. Try increasing the radius.")

@@ -12,6 +12,15 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * math.asin(math.sqrt(a))
     return R * c
 
+# Function to get address from lat/lon (reverse geocoding)
+def get_address(lat, lon):
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lon}&format=json"
+        response = requests.get(url, headers={"User-Agent": "streamlit-app"}).json()
+        return response.get("display_name", "Address not found")
+    except:
+        return "Error fetching address"
+
 # Sample rental data
 rentals = [
     {"name": "Car Rental A", "lat": 17.385, "lon": 78.486, "type": "Car", "price": "₹1200/day"},
@@ -30,13 +39,13 @@ user_lat, user_lon = None, None
 
 # Option 1: Live Location
 if option == "📍 Use Live Location":
-    # Streamlit can't directly access GPS, so we use ipinfo.io (approx location by IP)
     if st.button("Get My Live Location"):
         try:
             res = requests.get("https://ipinfo.io/json").json()
             loc = res["loc"].split(",")
             user_lat, user_lon = float(loc[0]), float(loc[1])
-            st.success(f"✅ Location detected: Lat {user_lat}, Lon {user_lon}")
+            address = get_address(user_lat, user_lon)
+            st.success(f"✅ Location detected: {address}")
         except:
             st.error("Could not fetch live location automatically.")
 
@@ -46,10 +55,10 @@ else:
     if area:
         try:
             url = f"https://nominatim.openstreetmap.org/search?format=json&q={area}"
-            response = requests.get(url).json()
+            response = requests.get(url, headers={"User-Agent": "streamlit-app"}).json()
             if response:
                 user_lat, user_lon = float(response[0]["lat"]), float(response[0]["lon"])
-                st.success(f"✅ Location found: {area} (Lat {user_lat}, Lon {user_lon})")
+                st.success(f"✅ Location found: {response[0]['display_name']}")
             else:
                 st.error("❌ Location not found. Try another area.")
         except:
